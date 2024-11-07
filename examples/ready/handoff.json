@@ -1,0 +1,42 @@
+{
+  "schemaVersion": "1",
+  "generated": "2026-09-14T09:30:00Z",
+  "objective": "Make the export job retry a failed upload three times before giving up.",
+  "repository": "services/export-worker",
+  "branch": "retry-uploads",
+  "baseRevision": "3f9a2c1d4e5b6a7c8d9e0f1a2b3c4d5e6f708192",
+  "changes": [
+    { "path": "src/upload.mjs", "status": "modified", "committed": true },
+    { "path": "test/upload.test.mjs", "status": "added", "committed": true },
+    {
+      "path": "docs/retry-policy.md",
+      "status": "added",
+      "committed": false,
+      "carriedIn": "patches/0001-retry-policy-doc.patch",
+      "note": "Written but not committed; the patch travels with this packet."
+    }
+  ],
+  "acceptance": [
+    "A failed upload is retried three times with the documented backoff.",
+    "A fourth failure raises the existing UploadFailed error unchanged.",
+    "npm run check exits 0 at the handoff revision with the working tree applied."
+  ],
+  "checks": [
+    {
+      "name": "unit",
+      "command": "npm test",
+      "result": "pass",
+      "revision": "3f9a2c1d4e5b6a7c8d9e0f1a2b3c4d5e6f708192",
+      "includesUncommitted": true
+    },
+    {
+      "name": "lint",
+      "command": "npm run lint",
+      "result": "pass",
+      "revision": "3f9a2c1d4e5b6a7c8d9e0f1a2b3c4d5e6f708192",
+      "includesUncommitted": true
+    }
+  ],
+  "blockers": [],
+  "nextAction": "Apply patches/0001-retry-policy-doc.patch, then wire the backoff constant into the worker configuration."
+}

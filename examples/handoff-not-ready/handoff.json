@@ -1,0 +1,22 @@
+{
+  "schemaVersion": "1",
+  "generated": "2026-09-10T22:05:00Z",
+  "objective": "Finish the retry work.",
+  "repository": "services/export-worker",
+  "branch": "retry-uploads",
+  "changes": [
+    { "path": "src/upload.mjs", "status": "modified", "committed": false },
+    { "path": "src/config.mjs", "status": "modified", "committed": true }
+  ],
+  "acceptance": ["Uploads retry."],
+  "checks": [
+    {
+      "name": "unit",
+      "command": "AWS_ACCESS_KEY_ID=AKIAIOSFODNN7EXAMPLE npm test",
+      "result": "pass",
+      "revision": "0000000000000000000000000000000000000000"
+    }
+  ],
+  "blockers": [],
+  "nextAction": "user: can you finish the retry work?\nassistant: I started on it.\nuser: what is left?\nassistant: the backoff constant.\nuser: ok\nassistant: I will hand this over.\ntool: ran npm test"
+}
