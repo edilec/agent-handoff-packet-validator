@@ -10,7 +10,7 @@
  * strictly worse than not looking.
  */
 
-import { escapePointerSegment } from './text.mjs'
+import { escapePointerSegment, renderable } from './text.mjs'
 
 /**
  * Credential shapes, each one a published prefix format rather than a guess.
@@ -60,7 +60,10 @@ const REDACTORS = CREDENTIAL_PATTERNS.map(({ id, pattern }) => ({
  * had not.
  */
 export function redactCredentials(text) {
-  let result = String(text)
+  // `renderable`, not `String`: this runs on its way into a finding, and a
+  // value that cannot be turned into a string must cost its own field and no
+  // more than that.
+  let result = renderable(text)
   for (const { id, global } of REDACTORS) result = result.replace(global, `[redacted ${id}]`)
   return result
 }

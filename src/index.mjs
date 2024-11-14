@@ -47,7 +47,7 @@ export {
 export { CREDENTIAL_PATTERNS, countTranscriptTurns, findCredentials, redactCredentials, walkStrings } from './scan.mjs'
 export {
   CONTROL_CLASSES, byCodeUnit, decodeUtf8, escapePointerSegment, excerpt, hasForbiddenCharacter,
-  isPlainObject, parseFailureDetail,
+  isPlainObject, parseFailureDetail, renderable,
 } from './text.mjs'
 
 export const TOOL_ID = 'agent-handoff-packet-validator'
@@ -803,7 +803,10 @@ export async function checkHandoffPacket(options = {}) {
     run.addUnknown({
       pointer: '/schemaVersion',
       ruleId: 'schema-version-unsupported',
-      message: `This build understands packet schemaVersion "${SUPPORTED_PACKET_VERSION}"; the packet declares "${excerpt(String(document.schemaVersion), 40)}". It was not interpreted.`,
+      // Not `String(document.schemaVersion)`: a value carrying a non-callable
+      // `toString` throws there, and this site is reached before any schema
+      // check, so it would cost the report on any packet at all.
+      message: `This build understands packet schemaVersion "${SUPPORTED_PACKET_VERSION}"; the packet declares "${excerpt(document.schemaVersion, 40)}". It was not interpreted.`,
       suggestion: 'Validate the packet with a build that understands its schema version.',
     })
     return buildReport(run, state, limits)

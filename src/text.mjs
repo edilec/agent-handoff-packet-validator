@@ -88,7 +88,34 @@ export const CONTROL_CLASSES = Object.freeze({
 export const EXCERPT_LIMIT = 160
 
 /**
- * A bounded, single-line, control-free rendering of an untrusted string.
+ * Render a value as text without trusting it to be renderable.
+ *
+ * `String(value)` throws `Cannot convert object to primitive value` for an
+ * object carrying a non-callable own `toString`, and `{"toString": {}}` in a
+ * packet is enough to reach it -- `schemaVersion` did, before any schema check
+ * and so on any packet at all. Uncaught, that costs the whole report: stdout is
+ * empty on exit 2, which is the shape this contract reserves for a
+ * configuration error, and one malformed document suppresses the findings for
+ * every other input in the same run.
+ *
+ * A value that cannot be rendered is described by its shape instead, which is
+ * what the rest of this module does with untrusted content anyway: described,
+ * never reproduced. The description is `[object]` or `[array]` -- it carries
+ * nothing of the packet, so a credential in a neighbouring field cannot leak
+ * out through it.
+ */
+export function renderable(value) {
+  if (typeof value === 'string') return value
+  try {
+    return String(value)
+  } catch {
+    if (Array.isArray(value)) return '[array]'
+    return `[${value === null ? 'null' : typeof value}]`
+  }
+}
+
+/**
+ * A bounded, single-line, control-free rendering of an untrusted value.
  *
  * Everything that came out of a packet passes through here on its way to the
  * report: changed paths, check names, blocker summaries, JSON Pointer segments
@@ -96,7 +123,7 @@ export const EXCERPT_LIMIT = 160
  */
 export function excerpt(value, limit = EXCERPT_LIMIT) {
   if (!Number.isInteger(limit) || limit < 1) throw new TypeError('Excerpt limit must be a positive integer')
-  const flattened = String(value).replace(CONTROL, ' ').replace(/\s+/g, ' ').trim()
+  const flattened = renderable(value).replace(CONTROL, ' ').replace(/\s+/g, ' ').trim()
   if (flattened.length <= limit) return flattened
   return `${flattened.slice(0, limit)}...`
 }
@@ -104,12 +131,12 @@ export function excerpt(value, limit = EXCERPT_LIMIT) {
 /** True when a string carries any character the report may not reproduce. */
 export function hasForbiddenCharacter(value) {
   CONTROL.lastIndex = 0
-  return CONTROL.test(String(value))
+  return CONTROL.test(renderable(value))
 }
 
 /** Escape one path segment for a JSON Pointer, per RFC 6901, then sanitise it. */
 export function escapePointerSegment(segment) {
-  return excerpt(String(segment).replaceAll('~', '~0').replaceAll('/', '~1'), 120)
+  return excerpt(renderable(segment).replaceAll('~', '~0').replaceAll('/', '~1'), 120)
 }
 
 /** A value that is an object and not an array and not null. */
