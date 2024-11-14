@@ -14,9 +14,11 @@ import { mkdir, symlink, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import test from 'node:test'
 
+import { isInside } from '../src/index.mjs'
 import { NOW, fixture, run, validPacket, workspace } from './support.mjs'
 
 const SECRET = 'AKIAIOSFODNN7EXAMPLE'
+const OUTSIDE = 'OUTSIDE THE ROOT'
 
 test('a symbolic link inside the root pointing outside is refused, and its content is not echoed', async (t) => {
   const dir = await workspace(t)
@@ -33,6 +35,52 @@ test('a symbolic link inside the root pointing outside is refused, and its conte
   assert.equal(report.findings[0].ruleId, 'path-escapes-root')
   assert.ok(!result.stdout.includes(SECRET), 'out-of-root content reached stdout')
   assert.ok(!result.stderr.includes(SECRET), 'out-of-root content reached stderr')
+})
+
+/**
+ * The separator is the whole boundary.
+ *
+ * `candidate.startsWith(root)` is true for a sibling directory whose name
+ * merely begins with the root's, so `/tmp/rootEVIL/handoff.json` reads as being
+ * inside `/tmp/root`. Every other confinement case in this file passes with
+ * that mutation in place -- the out-of-root packet they use is in a PARENT, not
+ * a sibling-prefix -- which is exactly how the boundary went unpinned.
+ */
+test('a sibling directory whose name starts with the root\'s name is outside it', async (t) => {
+  assert.equal(isInside('/a/root', '/a/rootEVIL'), false)
+  assert.equal(isInside('/a/root', '/a/rootEVIL/handoff.json'), false)
+  assert.equal(isInside('/a/root', '/a/root'), true, 'the root itself is inside the root')
+  assert.equal(isInside('/a/root', '/a/root/nested/handoff.json'), true)
+  assert.equal(isInside('/a/root/', '/a/root/nested'), true, 'a trailing separator must not double it')
+
+  const dir = await workspace(t)
+  const root = join(dir, 'root')
+  const sibling = join(dir, 'rootEVIL')
+  await mkdir(root, { recursive: true })
+  await mkdir(sibling, { recursive: true })
+  await writeFile(join(sibling, 'handoff.json'), JSON.stringify(validPacket({ objective: OUTSIDE })))
+  await symlink(join(sibling, 'handoff.json'), join(root, 'handoff.json'))
+
+  const result = await run(['--root', root, '--now', NOW])
+  const report = JSON.parse(result.stdout)
+
+  assert.equal(report.status, 'incomplete')
+  assert.equal(result.code, 2)
+  assert.equal(report.findings[0].ruleId, 'path-escapes-root')
+  assert.equal(report.summary.changes, 0, 'a packet from outside the root was validated')
+  assert.ok(!result.stdout.includes(OUTSIDE), 'out-of-root content reached stdout')
+  assert.ok(!result.stderr.includes(OUTSIDE), 'out-of-root content reached stderr')
+})
+
+test('a directory inside the root whose name starts with the root\'s name is still read', async (t) => {
+  const dir = await workspace(t)
+  const root = join(dir, 'root')
+  await mkdir(join(root, 'rootNOTES'), { recursive: true })
+  await writeFile(join(root, 'rootNOTES', 'handoff.json'), JSON.stringify(validPacket()))
+
+  const result = await run(['--root', root, '--packet', 'rootNOTES/handoff.json', '--now', NOW])
+  assert.equal(result.code, 0, 'a confinement that refuses everything is not a confinement')
+  assert.equal(JSON.parse(result.stdout).status, 'pass')
 })
 
 test('a symbolic link to a path that does not exist is refused without creating anything', async (t) => {
