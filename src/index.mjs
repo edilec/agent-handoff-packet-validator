@@ -46,8 +46,8 @@ export {
 } from './packet.mjs'
 export { CREDENTIAL_PATTERNS, countTranscriptTurns, findCredentials, redactCredentials, walkStrings } from './scan.mjs'
 export {
-  CONTROL_CLASSES, byCodeUnit, decodeUtf8, escapePointerSegment, excerpt, hasForbiddenCharacter,
-  isPlainObject, parseFailureDetail, renderable,
+  CONTROL_CLASSES, EXCERPT_LIMIT, byCodeUnit, decodeUtf8, escapePointerSegment, excerpt,
+  hasForbiddenCharacter, isPlainObject, parseFailureDetail, renderable,
 } from './text.mjs'
 
 export const TOOL_ID = 'agent-handoff-packet-validator'

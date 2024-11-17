@@ -12,8 +12,8 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 
 import {
-  DEFAULT_LIMITS, DEFAULT_POLICY, HARD_LIMITS, HARD_POLICY,
-  checkHandoffPacket, validateLimits, validatePolicy,
+  DEFAULT_LIMITS, DEFAULT_POLICY, EXCERPT_LIMIT, HARD_LIMITS, HARD_POLICY,
+  checkHandoffPacket, excerpt, validateLimits, validatePolicy,
 } from '../src/index.mjs'
 import { BASE_REVISION, NOW, fixture, run, validPacket, validate, workspace } from './support.mjs'
 
@@ -169,4 +169,65 @@ test('the walk bound is reported as a bound, with no claim about what was not sc
 
   const full = await validate(dir)
   assert.equal(full.report.summary.credentialMatches, 1)
+})
+
+
+/**
+ * The output bound, which is a limit like any other and was defended by
+ * nothing.
+ *
+ * The house contract calls evidence "length-bounded". Removing the length check
+ * from excerpt() left all 137 tests green, so "bounded" was a declaration with
+ * no behavioural defence anywhere in the suite.
+ *
+ * Both halves are here: the function at its own boundary, and every string in a
+ * real report driven from a packet built to be long in each place an untrusted
+ * value reaches output -- a check name, a changed path, an unknown field name.
+ */
+test('excerpt bounds what it returns, and does not truncate what already fits', () => {
+  assert.equal(excerpt('x'.repeat(EXCERPT_LIMIT)), 'x'.repeat(EXCERPT_LIMIT), 'a value at the limit is emitted whole')
+  assert.equal(excerpt('x'.repeat(EXCERPT_LIMIT + 1)).length, EXCERPT_LIMIT + 3)
+  assert.ok(excerpt('x'.repeat(EXCERPT_LIMIT + 1)).endsWith('...'))
+  assert.equal(excerpt('x'.repeat(5000), 40).length, 43)
+  assert.equal(excerpt('short', 40), 'short')
+  assert.throws(() => excerpt('x', 0), /positive integer/)
+})
+
+/** The widest string the report may carry: the message limit plus an ellipsis. */
+const OUTPUT_LIMIT = 403
+
+function stringsOf(value, found = []) {
+  if (typeof value === 'string') found.push(value)
+  else if (Array.isArray(value)) for (const entry of value) stringsOf(entry, found)
+  else if (value !== null && typeof value === 'object') for (const entry of Object.values(value)) stringsOf(entry, found)
+  return found
+}
+
+test('no string in a report is longer than the widest documented bound', async (t) => {
+  const dir = await workspace(t)
+  const longPath = `src/${'p'.repeat(390)}.mjs`
+  await fixture(dir, {
+    packet: validPacket({
+      [`unknown_${'u'.repeat(1500)}`]: 'x',
+      changes: [
+        { path: longPath, status: 'modified', committed: true },
+        { path: longPath, status: 'modified', committed: false },
+      ],
+      checks: [
+        { name: 'n'.repeat(1500), command: 'npm test', result: 'fail', revision: BASE_REVISION },
+      ],
+    }),
+  })
+  const result = await validate(dir)
+
+  assert.ok(result.report.findings.length >= 4, 'the fixture stopped producing the findings it was built for')
+  for (const value of stringsOf(result.report)) {
+    assert.ok(
+      value.length <= OUTPUT_LIMIT,
+      `a report string ran to ${value.length} characters: ${value.slice(0, 80)}...`,
+    )
+  }
+  for (const line of result.stderr.split('\n')) {
+    assert.ok(line.length <= OUTPUT_LIMIT + 20, `a human summary line ran to ${line.length} characters`)
+  }
 })
