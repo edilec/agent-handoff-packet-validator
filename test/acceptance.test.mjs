@@ -200,3 +200,57 @@ test('a check that ran somewhere else is reported against the base revision', as
   assert.equal(finding.severity, 'warning')
   assert.match(finding.evidence, /check revision a1b2c3d4e5f6\.\.\., base revision 3f9a2c1d4e5b\.\.\./)
 })
+
+
+/**
+ * A blocker with no usable summary.
+ *
+ * The rule is documented -- "This blocker has no usable summary", error -- and
+ * removing the requirement turned a failing packet into a clean pass with all
+ * 137 tests still green. blocker-invalid stayed covered by its other routes (a
+ * blocker that is not an object, a blocker with an unknown field), so the
+ * severity-coverage test was satisfied by rules that had nothing to do with
+ * this one. A rule with several routes needs a case per route.
+ */
+test('a blocker that names an owner but says nothing is refused, and not counted', async (t) => {
+  const dir = await workspace(t)
+  await fixture(dir, { packet: validPacket({ blockers: [{ owner: 'someone' }] }) })
+
+  const { code, report } = await validate(dir)
+  assert.equal(code, 1)
+  assert.equal(report.status, 'fail')
+  const finding = findingFor(report, 'blocker-invalid')
+  assert.equal(finding.severity, 'error')
+  assert.equal(finding.location.pointer, '/blockers/0/summary')
+  assert.match(finding.message, /no usable "summary"/)
+  assert.equal(report.summary.blockers, 0, 'an unusable blocker was counted as one')
+})
+
+test('a blocker whose summary is blank or not a string is refused the same way', async (t) => {
+  for (const summary of ['', '   ', 42, null, ['a list']]) {
+    const dir = await workspace(t)
+    await fixture(dir, { packet: validPacket({ blockers: [{ summary, owner: 'someone' }] }) })
+
+    const { code, report } = await validate(dir)
+    assert.equal(code, 1, `a summary of ${JSON.stringify(summary)} was accepted`)
+    assert.equal(findingFor(report, 'blocker-invalid').location.pointer, '/blockers/0/summary')
+    assert.equal(report.summary.blockers, 0)
+  }
+})
+
+test('a blocker that says what is blocked passes and is counted', async (t) => {
+  const dir = await workspace(t)
+  await fixture(dir, {
+    packet: validPacket({
+      blockers: [
+        { summary: 'The staging queue is full.', owner: 'platform' },
+        { summary: 'The vendor has not replied.' },
+      ],
+    }),
+  })
+
+  const { code, report } = await validate(dir)
+  assert.equal(code, 0, 'a requirement that refuses every blocker is not a requirement')
+  assert.equal(report.status, 'pass')
+  assert.equal(report.summary.blockers, 2)
+})
