@@ -51,10 +51,16 @@ node bin/agent-handoff-packet-validator.mjs \
   ERROR  base-revision-missing           handoff.json/baseRevision
   ERROR  uncommitted-change-unreachable  handoff.json/changes/0
   ERROR  credential-in-packet            handoff.json/checks/0/command
-  ERROR  transcript-embedded             handoff.json/nextAction
   WARN   check-excludes-uncommitted      handoff.json/checks/0/includesUncommitted
   WARN   packet-stale                    handoff.json/generated
+  ERROR  transcript-embedded             handoff.json/nextAction
 ```
+
+Findings are ordered by where they are, not by how bad they are: the sort key is
+`(file, pointer, ruleId, message)`, so `/nextAction` comes last whatever its
+severity. `test/examples.test.mjs` compares this block against what the CLI
+actually prints, because a README that shows a different order misdescribes part
+of the output contract.
 
 ## The packet
 
