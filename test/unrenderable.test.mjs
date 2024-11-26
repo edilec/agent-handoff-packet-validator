@@ -23,8 +23,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { excerpt, renderable } from '../src/index.mjs'
-import { redactCredentials } from '../src/scan.mjs'
+import { excerpt, redactCredentials, renderable } from '../src/index.mjs'
 import { fixture, ruleIds, validPacket, validate, workspace } from './support.mjs'
 
 /** An object JSON can carry and `String` cannot render, with a secret beside it. */
