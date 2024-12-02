@@ -28,4 +28,8 @@ of the public surface: renaming one is a breaking change and is recorded here.
   `docs/packet-rules.md`.
 - Limits for document size, nesting depth, node count, list length, findings and
   run time, each enforced and each reported by name.
+- A value the packet supplies that cannot be rendered as a string -- an object
+  with a non-callable `toString` -- is described by its shape (`[object]`,
+  `[array]`) and the run reports the packet as invalid with status `incomplete`,
+  rather than aborting with an empty stdout.
 - Examples: `examples/ready` (exit 0) and `examples/handoff-not-ready` (exit 1).
