@@ -33,6 +33,7 @@ const CASES = [
   { ruleId: 'base-revision-missing', severity: 'error', status: 'fail', exit: 1, packet: () => without('baseRevision') },
   { ruleId: 'blocker-invalid', severity: 'error', status: 'fail', exit: 1, packet: () => validPacket({ blockers: ['just a string'] }) },
   { ruleId: 'blockers-missing', severity: 'error', status: 'fail', exit: 1, packet: () => without('blockers') },
+  { ruleId: 'branch-invalid', severity: 'error', status: 'fail', exit: 1, packet: () => validPacket({ branch: 42 }) },
   {
     ruleId: 'carried-in-invalid',
     severity: 'error',

@@ -238,6 +238,49 @@ test('a blocker whose summary is blank or not a string is refused the same way',
   }
 })
 
+/**
+ * `branch` is optional, and "optional" was being read as "unread".
+ *
+ * It sat in ALLOWED_PACKET_FIELDS and nothing ever looked at it, so every shape
+ * below reported a clean pass -- including an object whose `toString` is not
+ * callable, which is the value that costs other tools their whole report. An
+ * accepted-and-ignored field is exactly what the unknown-field rule exists to
+ * prevent, so it is refused here too.
+ */
+test('a declared branch that is not a usable name is refused, not ignored', async (t) => {
+  for (const branch of [42, '', '   ', null, ['main'], {}, { toString: {} }, `feature${String.fromCharCode(0x0a)}main`]) {
+    const dir = await workspace(t)
+    await fixture(dir, { packet: validPacket({ branch }) })
+
+    const { code, report } = await validate(dir)
+    assert.equal(code, 1, `a branch of ${JSON.stringify(branch)} was accepted`)
+    assert.equal(report.status, 'fail')
+    const finding = findingFor(report, 'branch-invalid')
+    assert.equal(finding.severity, 'error')
+    assert.equal(finding.location.pointer, '/branch')
+  }
+})
+
+/**
+ * The other half, without which a rule that refuses every branch would pass the
+ * test above while making the field unusable.
+ */
+test('an omitted branch is silent, and a usable one passes', async (t) => {
+  const absent = await workspace(t)
+  await fixture(absent, { packet: validPacket() })
+  const omitted = await validate(absent)
+  assert.equal(omitted.code, 0)
+  assert.equal(ruleIds(omitted.report).includes('branch-invalid'), false)
+
+  for (const branch of ['retry-uploads', 'feature/retry-uploads', 'release-2026.09']) {
+    const dir = await workspace(t)
+    await fixture(dir, { packet: validPacket({ branch }) })
+    const { code, report } = await validate(dir)
+    assert.equal(code, 0, `a branch of ${JSON.stringify(branch)} was refused`)
+    assert.deepEqual(report.findings, [])
+  }
+})
+
 test('a blocker that says what is blocked passes and is counted', async (t) => {
   const dir = await workspace(t)
   await fixture(dir, {

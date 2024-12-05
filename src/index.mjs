@@ -116,6 +116,7 @@ export const RULE_SEVERITY = Object.freeze({
   'base-revision-missing': 'error',
   'blocker-invalid': 'error',
   'blockers-missing': 'error',
+  'branch-invalid': 'error',
   'carried-in-invalid': 'error',
   'carried-in-on-committed-change': 'warning',
   'change-committed-unknown': 'error',
@@ -379,6 +380,32 @@ function requireString(run, document, field, ruleId, state) {
     ruleId,
     message: `The packet declares no usable "${field}". A successor cannot start without it, and an absent field is not an empty one.`,
     suggestion: `Declare "${field}" as a non-empty string.`,
+  })
+}
+
+/**
+ * An optional field the packet does declare is still a field it declares.
+ *
+ * `branch` sat in ALLOWED_PACKET_FIELDS and was read by nothing, so
+ * `"branch": 42`, `"branch": ""` and `"branch": {"toString": {}}` all reported
+ * a clean pass. That is the accepted-and-ignored shape -- the same one a
+ * sibling tool shipped as a policy key -- and it is worse here than an unknown
+ * field, because an unknown field is at least refused. Optional means the
+ * packet may omit it, not that anything at all may be written there.
+ *
+ * Omitting the field stays silent, and nothing about the branch is claimed
+ * beyond its shape: this tool opens no repository, so it cannot know whether
+ * the branch exists.
+ */
+function optionalName(run, document, field, ruleId) {
+  if (!Object.hasOwn(document, field)) return
+  const value = document[field]
+  if (typeof value === 'string' && value.trim().length > 0 && !hasForbiddenCharacter(value)) return
+  run.add({
+    pointer: `/${field}`,
+    ruleId,
+    message: `The packet declares "${field}", but not as a usable name: an optional field that is present must be a non-empty string with no control, separator or bidi character.`,
+    suggestion: `Write "${field}" as a non-empty string, or omit it.`,
   })
 }
 
@@ -844,6 +871,7 @@ export async function checkHandoffPacket(options = {}) {
   requireString(run, document, 'objective', 'objective-missing', state)
   requireString(run, document, 'repository', 'repository-missing', state)
   requireString(run, document, 'nextAction', 'next-action-missing', state)
+  optionalName(run, document, 'branch', 'branch-invalid')
 
   state.checked += 1
   if (!Object.hasOwn(document, 'baseRevision')) {
