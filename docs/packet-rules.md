@@ -19,6 +19,7 @@ the emitted severity word, the report status and the process exit code.
 | `base-revision-missing` | error | No `baseRevision`. The successor has no tree to start from. |
 | `blocker-invalid` | error | A blocker is not an object with a usable `summary`, or carries an unknown field. |
 | `blockers-missing` | error | No `blockers` array. An absent list is not a statement that there are none. |
+| `branch-invalid` | error | `branch` is declared but is not a usable name. An optional field the packet omits is silent; one it declares is read. |
 | `carried-in-invalid` | error | `carriedIn` is not a relative path naming the artefact that carries the change. |
 | `carried-in-on-committed-change` | warning | A change is both committed and carried separately. One of the two is wrong. |
 | `change-committed-unknown` | error | A change does not say whether it is committed, so whether the successor can obtain it is unknown. |

@@ -101,6 +101,13 @@ Nine required fields: `objective`, `repository`, `baseRevision`, `changes`,
 `schemaVersion` are optional; anything else is refused as an unknown field, so a
 typo cannot quietly become a field nobody reads.
 
+**Optional is about omitting the field, not about what may go in it.** A packet
+that leaves `branch` out is silent on the point and passes. A packet that
+declares `"branch": 42`, `"branch": ""` or a name carrying a control character
+fails with `branch-invalid`, because an accepted-and-ignored field is a field
+nobody reads either. Nothing beyond the shape is claimed: this tool opens no
+repository, so it cannot know whether the branch exists.
+
 **An absent list is never an empty one.** `"blockers": []` says there are no
 blockers. Omitting `blockers` says nobody wrote it down, and those are different
 handoffs. The same goes for `changes`, `checks` and `acceptance`, and for a

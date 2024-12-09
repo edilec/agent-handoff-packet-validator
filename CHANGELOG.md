@@ -24,7 +24,10 @@ of the public surface: renaming one is a breaking change and is recorded here.
 - `transcript-embedded` and `field-too-long`: a packet is a summary.
 - `packet-stale` against an injected evaluation instant (`--now`), recorded in
   `summary.evaluatedAt`.
-- Forty-six rules with a frozen severity table, documented in
+- `branch-invalid`: `branch` is optional, which means the packet may omit it,
+  not that anything may be written there. A declared `branch` that is not a
+  usable name is refused rather than accepted and ignored.
+- Forty-seven rules with a frozen severity table, documented in
   `docs/packet-rules.md`.
 - Limits for document size, nesting depth, node count, list length, findings and
   run time, each enforced and each reported by name.
