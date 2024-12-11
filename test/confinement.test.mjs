@@ -10,7 +10,7 @@
  */
 
 import assert from 'node:assert/strict'
-import { mkdir, symlink, writeFile } from 'node:fs/promises'
+import { lstat, mkdir, readdir, symlink, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import test from 'node:test'
 
@@ -83,17 +83,39 @@ test('a directory inside the root whose name starts with the root\'s name is sti
   assert.equal(JSON.parse(result.stdout).status, 'pass')
 })
 
+/**
+ * A dangling link is the case where "read-only" and "unknown is never a pass"
+ * meet: resolving the target may not create it, and not finding it may not read
+ * as an absence the run was content with.
+ *
+ * The second half of that sentence used to be the whole test. Nothing stated
+ * that the target stayed absent, so a build that opened the link for writing --
+ * which is what creating it would mean -- passed while the name said otherwise.
+ */
 test('a symbolic link to a path that does not exist is refused without creating anything', async (t) => {
   const dir = await workspace(t)
   const root = join(dir, 'root')
   await mkdir(root, { recursive: true })
-  await symlink(join(dir, 'never-created.json'), join(root, 'handoff.json'))
+  const target = join(dir, 'never-created.json')
+  await symlink(target, join(root, 'handoff.json'))
+  const before = (await readdir(dir)).sort()
 
   const result = await run(['--root', root, '--now', NOW])
   const report = JSON.parse(result.stdout)
   assert.equal(result.code, 2)
   assert.equal(report.status, 'incomplete')
   assert.ok(['path-escapes-root', 'input-unreadable'].includes(report.findings[0].ruleId))
+
+  // The "without creating anything" half, which the name claimed and nothing
+  // asserted. lstat, not stat: stat would follow the link and report ENOENT
+  // whether or not the run had created something else beside it.
+  await assert.rejects(
+    () => lstat(target),
+    (error) => error.code === 'ENOENT',
+    'the run created the file the dangling link pointed at',
+  )
+  assert.deepEqual((await readdir(dir)).sort(), before, 'the run created something in the workspace')
+  assert.deepEqual(await readdir(root), ['handoff.json'], 'the run created something inside the root')
 })
 
 test('a legitimate packet under a symlinked root is still read', async (t) => {
