@@ -54,7 +54,58 @@ test('--root is required and an unusable one is a configuration error', async (t
   assert.match(missing.stderr, /root is not a readable directory/)
 })
 
-test('stdout is parseable JSON in every outcome, and --json silences the summary', async (t) => {
+/**
+ * "In every outcome" is the claim, so every outcome is here.
+ *
+ * The body used to run one passing fixture twice. That left the three report
+ * statuses the tool can reach uncovered, and it left the outcomes where stdout
+ * is deliberately NOT JSON -- the empty stream a configuration error owes, and
+ * the plain text of --help and --version -- looking like cases the name had
+ * quietly excluded. Both halves of the contract are asserted here: a run with a
+ * subject writes a parseable report and nothing else, and a run that never had
+ * one writes nothing at all.
+ */
+test('stdout is parseable JSON in every outcome that produces a report, and empty in every one that does not', async (t) => {
+  const dir = await workspace(t)
+
+  const reported = [
+    { name: 'pass', exit: 0, status: 'pass', packet: validPacket() },
+    { name: 'fail', exit: 1, status: 'fail', packet: validPacket({ objective: '' }) },
+    { name: 'incomplete', exit: 2, status: 'incomplete', packet: validPacket({ schemaVersion: '2' }) },
+    { name: 'unparseable input', exit: 2, status: 'incomplete', raw: '{ not json' },
+  ]
+
+  for (const outcome of reported) {
+    await fixture(dir, outcome.raw === undefined ? { packet: outcome.packet } : { raw: outcome.raw })
+    const result = await run(['--root', dir, '--now', NOW])
+
+    assert.equal(result.code, outcome.exit, `the ${outcome.name} outcome exited ${result.code}`)
+    const report = JSON.parse(result.stdout)
+    assert.equal(report.status, outcome.status)
+    assert.equal(`${JSON.stringify(report, null, 2)}\n`, result.stdout, `stdout carried something besides the ${outcome.name} report`)
+  }
+
+  const silent = [
+    { name: 'an unknown option', args: ['--nonsense'] },
+    { name: 'a missing root', args: ['--now', NOW] },
+    { name: 'an unreadable root', args: ['--root', join(dir, 'absent'), '--now', NOW] },
+  ]
+
+  for (const outcome of silent) {
+    const result = await run(outcome.args)
+    assert.equal(result.code, 2, `${outcome.name} did not exit 2`)
+    assert.equal(result.stdout, '', `${outcome.name} wrote a report for a run that never had a subject`)
+    assert.ok(result.stderr.trim().length > 0, `${outcome.name} said nothing on stderr either`)
+  }
+
+  for (const flag of ['--help', '--version']) {
+    const result = await run([flag])
+    assert.equal(result.code, 0)
+    assert.throws(() => JSON.parse(result.stdout), `${flag} started emitting JSON; the report contract does not cover it`)
+  }
+})
+
+test('--json silences the human summary and changes nothing on stdout', async (t) => {
   const dir = await workspace(t)
   await fixture(dir, { packet: validPacket() })
 
