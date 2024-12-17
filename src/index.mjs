@@ -393,18 +393,25 @@ function requireString(run, document, field, ruleId, state) {
  * field, because an unknown field is at least refused. Optional means the
  * packet may omit it, not that anything at all may be written there.
  *
- * Omitting the field stays silent, and nothing about the branch is claimed
- * beyond its shape: this tool opens no repository, so it cannot know whether
- * the branch exists.
+ * `branch` was not the only one. A change's `note` and a blocker's `owner` and
+ * `detail` sat in their own allowlists and were read by nothing either, so
+ * fixing the first and writing the principle into the README while the other
+ * three stayed open would have documented a coverage that was not there. One
+ * function, four call sites, so the next optional field has somewhere obvious
+ * to go.
+ *
+ * Omitting a field stays silent, and nothing is claimed beyond the shape: this
+ * tool opens no repository, so it cannot know whether the branch exists, and it
+ * has no idea who the owner is.
  */
-function optionalName(run, document, field, ruleId) {
-  if (!Object.hasOwn(document, field)) return
-  const value = document[field]
+function optionalText(run, container, field, { ruleId, pointer = `/${field}`, subject = 'The packet', noun = 'name' }) {
+  if (!Object.hasOwn(container, field)) return
+  const value = container[field]
   if (typeof value === 'string' && value.trim().length > 0 && !hasForbiddenCharacter(value)) return
   run.add({
-    pointer: `/${field}`,
+    pointer,
     ruleId,
-    message: `The packet declares "${field}", but not as a usable name: an optional field that is present must be a non-empty string with no control, separator or bidi character.`,
+    message: `${subject} declares "${field}", but not as a usable ${noun}: an optional field that is present must be a non-empty string with no control, separator or bidi character.`,
     suggestion: `Write "${field}" as a non-empty string, or omit it.`,
   })
 }
@@ -490,6 +497,13 @@ function validateChanges(run, document, limits, state, deadline) {
         suggestion: 'State what happened to the file.',
       })
     }
+
+    optionalText(run, change, 'note', {
+      ruleId: 'change-invalid',
+      pointer: `${pointer}/note`,
+      subject: 'This change',
+      noun: 'note',
+    })
 
     const hasCarrier = Object.hasOwn(change, 'carriedIn')
     if (hasCarrier && !isUsablePath(change.carriedIn)) {
@@ -653,6 +667,22 @@ function validateChecks(run, document, limits, state, baseRevision, deadline) {
         ruleId: 'check-not-passing',
         message: `The check "${excerpt(name ?? `checks[${index}]`, 80)}" is recorded as "${check.result}". The successor inherits it; this is reported so the handoff is not read as green.`,
         suggestion: 'Fix it before handing off, or name it in "blockers" with what is known about it.',
+      })
+    }
+
+    /**
+     * A flag the packet declares is a flag it means. `"includesUncommitted":
+     * "yes"` used to be accepted and then read as `!== true`, so a packet
+     * saying the check covered the working tree was silently recorded as
+     * saying the opposite. Omitting it stays the conservative default; writing
+     * something that is not a boolean is refused rather than reinterpreted.
+     */
+    if (Object.hasOwn(check, 'includesUncommitted') && typeof check.includesUncommitted !== 'boolean') {
+      run.add({
+        pointer: `${pointer}/includesUncommitted`,
+        ruleId: 'check-invalid',
+        message: 'This check declares "includesUncommitted", but not as a boolean. Whether the pass covers the working tree is what the flag answers, so a value that is not true or false is refused rather than read as "no".',
+        suggestion: 'Declare "includesUncommitted": true or false, or omit it.',
       })
     }
 
@@ -871,7 +901,7 @@ export async function checkHandoffPacket(options = {}) {
   requireString(run, document, 'objective', 'objective-missing', state)
   requireString(run, document, 'repository', 'repository-missing', state)
   requireString(run, document, 'nextAction', 'next-action-missing', state)
-  optionalName(run, document, 'branch', 'branch-invalid')
+  optionalText(run, document, 'branch', { ruleId: 'branch-invalid' })
 
   state.checked += 1
   if (!Object.hasOwn(document, 'baseRevision')) {
@@ -978,6 +1008,15 @@ export async function checkHandoffPacket(options = {}) {
           })
         }
       }
+      for (const field of ['detail', 'owner']) {
+        optionalText(run, blocker, field, {
+          ruleId: 'blocker-invalid',
+          pointer: `${pointer}/${field}`,
+          subject: 'This blocker',
+          noun: field === 'owner' ? 'owner' : 'detail',
+        })
+      }
+
       if (typeof blocker.summary !== 'string' || blocker.summary.trim().length === 0) {
         run.add({
           pointer: `${pointer}/summary`,

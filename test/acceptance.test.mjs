@@ -297,3 +297,113 @@ test('a blocker that says what is blocked passes and is counted', async (t) => {
   assert.equal(report.status, 'pass')
   assert.equal(report.summary.blockers, 2)
 })
+
+/**
+ * `branch` was not the only optional field nobody read.
+ *
+ * A change's `note` and a blocker's `owner` and `detail` sat in their own
+ * allowlists and were read by nothing, and a check's `includesUncommitted` was
+ * read as `!== true`, so `"includesUncommitted": "yes"` was recorded as saying
+ * the opposite of what its author meant. Fixing `branch` alone and writing
+ * "optional is about omitting the field, not about what may go in it" into the
+ * README would have documented a coverage that did not exist.
+ *
+ * One case per field, each changing exactly one thing about a packet that
+ * otherwise passes.
+ */
+const OPTIONAL_FIELDS = [
+  {
+    name: 'a change\'s "note"',
+    ruleId: 'change-invalid',
+    pointer: '/changes/0/note',
+    build: (value) => validPacket({ changes: [{ path: 'src/upload.mjs', status: 'modified', committed: true, note: value }] }),
+    usable: 'Rewritten in place; the diff is small.',
+  },
+  {
+    name: 'a blocker\'s "owner"',
+    ruleId: 'blocker-invalid',
+    pointer: '/blockers/0/owner',
+    build: (value) => validPacket({ blockers: [{ summary: 'The staging queue is full.', owner: value }] }),
+    usable: 'platform',
+  },
+  {
+    name: 'a blocker\'s "detail"',
+    ruleId: 'blocker-invalid',
+    pointer: '/blockers/0/detail',
+    build: (value) => validPacket({ blockers: [{ summary: 'The staging queue is full.', detail: value }] }),
+    usable: 'It has been full since the vendor incident on the 12th.',
+  },
+]
+
+for (const field of OPTIONAL_FIELDS) {
+  test(`${field.name} that is declared and unusable is refused, not ignored`, async (t) => {
+    for (const value of [42, '', '   ', null, ['a list'], {}, { toString: {} }, `first${String.fromCharCode(0x0a)}second`]) {
+      const dir = await workspace(t)
+      await fixture(dir, { packet: field.build(value) })
+
+      const { code, report } = await validate(dir)
+      assert.equal(code, 1, `${field.name} of ${JSON.stringify(value)} was accepted`)
+      assert.equal(report.status, 'fail')
+      const finding = findingFor(report, field.ruleId)
+      assert.equal(finding.severity, 'error')
+      assert.equal(finding.location.pointer, field.pointer)
+    }
+  })
+
+  test(`${field.name} omitted is silent, and a usable one passes`, async (t) => {
+    const dir = await workspace(t)
+    await fixture(dir, { packet: field.build(field.usable) })
+    const { code, report } = await validate(dir)
+
+    assert.equal(code, 0, `a usable ${field.name} was refused`)
+    assert.equal(report.status, 'pass')
+    assert.deepEqual(report.findings, [], 'a check that refuses everything makes the field useless')
+  })
+}
+
+/**
+ * `includesUncommitted` is the one where accepting anything was worse than
+ * ignoring it: the flag decides whether a passing check covers the working
+ * tree, and every non-boolean was read as "it does not".
+ */
+test('a check that declares includesUncommitted as something other than a boolean is refused', async (t) => {
+  for (const value of ['yes', 1, 0, null, {}, []]) {
+    const dir = await workspace(t)
+    await fixture(dir, {
+      packet: validPacket({
+        checks: [{ name: 'unit', command: 'npm test', result: 'pass', revision: BASE_REVISION, includesUncommitted: value }],
+      }),
+    })
+
+    const { code, report } = await validate(dir)
+    assert.equal(code, 1, `includesUncommitted of ${JSON.stringify(value)} was accepted and read as false`)
+    const finding = findingFor(report, 'check-invalid')
+    assert.equal(finding.location.pointer, '/checks/0/includesUncommitted')
+  }
+})
+
+test('includesUncommitted omitted stays the conservative default, and either boolean passes', async (t) => {
+  for (const value of [true, false]) {
+    const dir = await workspace(t)
+    await fixture(dir, {
+      packet: validPacket({
+        checks: [{ name: 'unit', command: 'npm test', result: 'pass', revision: BASE_REVISION, includesUncommitted: value }],
+      }),
+    })
+    const { code, report } = await validate(dir)
+    assert.equal(code, 0, `includesUncommitted: ${value} was refused`)
+    assert.deepEqual(report.findings, [])
+  }
+
+  // Omitted, with an uncommitted change in the packet: still the warning that
+  // says the pass does not describe the tree, not a type complaint.
+  const dir = await workspace(t)
+  await fixture(dir, {
+    packet: validPacket({
+      changes: [{ path: 'src/upload.mjs', status: 'modified', committed: false, carriedIn: 'patches/0001.patch' }],
+    }),
+  })
+  const { report } = await validate(dir)
+  assert.ok(ruleIds(report).includes('check-excludes-uncommitted'))
+  assert.equal(findingFor(report, 'check-invalid'), undefined)
+})
