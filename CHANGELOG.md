@@ -26,7 +26,12 @@ of the public surface: renaming one is a breaking change and is recorded here.
   `summary.evaluatedAt`.
 - `branch-invalid`: `branch` is optional, which means the packet may omit it,
   not that anything may be written there. A declared `branch` that is not a
-  usable name is refused rather than accepted and ignored.
+  usable name is refused rather than accepted and ignored. The same applies to
+  every other optional field: a change's `note` and a blocker's `owner` and
+  `detail` are refused as `change-invalid` and `blocker-invalid` when declared
+  and unusable, and a check's `includesUncommitted` is refused as `check-invalid`
+  when it is declared as anything but a boolean, rather than being read as
+  `false`.
 - Forty-seven rules with a frozen severity table, documented in
   `docs/packet-rules.md`.
 - Limits for document size, nesting depth, node count, list length, findings and

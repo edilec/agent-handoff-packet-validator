@@ -17,18 +17,18 @@ the emitted severity word, the report status and the process exit code.
 | `acceptance-missing` | error | No `acceptance` array. An absent list is not an empty one. |
 | `base-revision-invalid` | error | `baseRevision` is not a full 40-character lowercase hexadecimal object name. A branch moves; an abbreviation is ambiguous. |
 | `base-revision-missing` | error | No `baseRevision`. The successor has no tree to start from. |
-| `blocker-invalid` | error | A blocker is not an object with a usable `summary`, or carries an unknown field. |
+| `blocker-invalid` | error | A blocker is not an object with a usable `summary`, declares `owner` or `detail` without writing a usable one, or carries an unknown field. |
 | `blockers-missing` | error | No `blockers` array. An absent list is not a statement that there are none. |
-| `branch-invalid` | error | `branch` is declared but is not a usable name. An optional field the packet omits is silent; one it declares is read. |
+| `branch-invalid` | error | `branch` is declared but is not a usable name. An optional field the packet omits is silent; one it declares is read. The same rule is applied to `note`, `owner`, `detail` and `includesUncommitted` under their own rule ids. |
 | `carried-in-invalid` | error | `carriedIn` is not a relative path naming the artefact that carries the change. |
 | `carried-in-on-committed-change` | warning | A change is both committed and carried separately. One of the two is wrong. |
 | `change-committed-unknown` | error | A change does not say whether it is committed, so whether the successor can obtain it is unknown. |
-| `change-invalid` | error | A change is not an object, has no usable `status`, or carries an unknown field. |
+| `change-invalid` | error | A change is not an object, has no usable `status`, declares `note` without writing a usable one, or carries an unknown field. |
 | `change-path-duplicate` | error | Two entries describe the same path, so the packet says two things about one file. |
 | `change-path-invalid` | error | A changed path is absolute, steps outside with `..`, is empty, or carries a control or bidi character. |
 | `changes-missing` | error | No `changes` array. "Nothing changed" and "nobody wrote it down" are different handoffs. |
 | `check-excludes-uncommitted` | warning | A check passed but does not claim to cover the packet's uncommitted changes. |
-| `check-invalid` | error | A check is not an object, or has no usable name, command or result. |
+| `check-invalid` | error | A check is not an object, has no usable name, command or result, or declares `includesUncommitted` as something other than a boolean. |
 | `check-not-passing` | warning | A recorded check did not pass. The successor inherits it. |
 | `check-revision-mismatch` | warning | A check ran at a revision other than the base revision, so it describes a different tree. |
 | `check-revision-missing` | error | A check does not say which revision it ran at. A result that floats free of a revision says nothing. |

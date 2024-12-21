@@ -108,6 +108,14 @@ fails with `branch-invalid`, because an accepted-and-ignored field is a field
 nobody reads either. Nothing beyond the shape is claimed: this tool opens no
 repository, so it cannot know whether the branch exists.
 
+The same goes for every other optional field: a change's `note`, a blocker's
+`owner` and `detail`, and a check's `includesUncommitted`. The last one is the
+reason this is not a tidiness rule. It answers whether a passing check covered
+the working tree, and `"includesUncommitted": "yes"` used to be accepted and then
+read as `!== true` — the packet said one thing and the report recorded the
+opposite. Omitting it still means the conservative default; writing something
+that is not a boolean is refused rather than reinterpreted.
+
 **An absent list is never an empty one.** `"blockers": []` says there are no
 blockers. Omitting `blockers` says nobody wrote it down, and those are different
 handoffs. The same goes for `changes`, `checks` and `acceptance`, and for a
