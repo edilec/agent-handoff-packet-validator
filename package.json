@@ -1,0 +1,52 @@
+{
+  "name": "agent-handoff-packet-validator",
+  "version": "0.1.0",
+  "description": "Check that a handoff packet says enough for another agent to continue -- objective, repository, base revision, changes, acceptance, checks, blockers, next action -- and carries no credential or embedded transcript.",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "lint": "for file in bin/*.mjs src/*.mjs test/*.mjs; do node --check \"$file\" || exit 1; done",
+    "test": "node --test",
+    "test:coverage": "node --test --experimental-test-coverage --test-coverage-include=src/**",
+    "example": "node bin/agent-handoff-packet-validator.mjs --root examples/ready --now 2026-09-14T12:00:00Z",
+    "example:failing": "node bin/agent-handoff-packet-validator.mjs --root examples/handoff-not-ready --now 2026-09-14T12:00:00Z; test $? -eq 1",
+    "pack:check": "npm pack --dry-run",
+    "check": "npm run lint && npm test && npm run example && npm run example:failing && npm run pack:check"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/edilec/agent-handoff-packet-validator.git"
+  },
+  "bin": {
+    "agent-handoff-packet-validator": "./bin/agent-handoff-packet-validator.mjs"
+  },
+  "exports": {
+    ".": "./src/index.mjs"
+  },
+  "files": [
+    "bin",
+    "src",
+    "examples",
+    "docs",
+    "README.md",
+    "CHANGELOG.md",
+    "LICENSE"
+  ],
+  "keywords": [
+    "handoff",
+    "agent",
+    "validation",
+    "static-analysis",
+    "credentials",
+    "git",
+    "cli"
+  ],
+  "author": "Edilec Private Limited",
+  "bugs": {
+    "url": "https://github.com/edilec/agent-handoff-packet-validator/issues"
+  },
+  "homepage": "https://github.com/edilec/agent-handoff-packet-validator#readme"
+}
